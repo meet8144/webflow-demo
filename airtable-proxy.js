@@ -1,6 +1,19 @@
 // netlify/functions/airtable-proxy.js
 
 export async function handler(event, context) {
+  
+  if (event.httpMethod === "OPTIONS") {
+     return {
+       statusCode: 200,
+       headers: {
+         "Access-Control-Allow-Origin": "*",          // or "http://localhost" if you want to restrict
+         "Access-Control-Allow-Headers": "Content-Type, Authorization",
+         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+       },
+       body: "",
+     };
+   }
+
   try {
     const params = event.queryStringParameters || {};
 
