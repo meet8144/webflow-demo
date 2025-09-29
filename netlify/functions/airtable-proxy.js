@@ -3,9 +3,11 @@ export async function handler(event, context) {
   try {
     const params = event.queryStringParameters || {};
 
+    // Table name
     const tableName = params.table || "All Events";
     const encodedTable = encodeURIComponent(tableName);
 
+    // Airtable credentials
     const baseId = process.env.AIRTABLE_BASE_ID;
     const apiKey = process.env.AIRTABLE_API_KEY;
 
@@ -14,29 +16,23 @@ export async function handler(event, context) {
     let url = `https://api.airtable.com/v0/${baseId}/${encodedTable}?`;
 
     // Build filterByFormula dynamically
-    let conditions = [];
+    const conditions = [];
 
-    // Date filter
-    if (params.date) {
-      const isoDate = `${params.date}T00:00:00.000Z`; // ISO format
-      conditions.push(`IS_SAME({Event Date}, "${isoDate}", 'day')`);
-    }
+    // Total Charged Amount filter
+    conditions.push(`{Total Charged Amount} >= 0`);
+    conditions.push(`{Total Charged Amount} <= 99999999999999`);
 
-    // Price filter
-    conditions.push(`{Total Charged Amount} >= 15`);
-    conditions.push(`{Total Charged Amount} <= 999999999`);
-
-    // City / Bypass
+    // OR conditions: city or bypass
     const orParts = [];
     if (params.city) orParts.push(`{Event City} = "${params.city}"`);
     if (params.bypass === "1") orParts.push(`{Universal Event Bypass} = TRUE()`);
-    if (orParts.length) conditions.push(`OR(${orParts.join(", ")})`);
+    if (orParts.length) conditions.push(`OR(${orParts.join(",")})`);
 
     const formula = conditions.length ? `AND(${conditions.join(",")})` : null;
 
-    // Build query string
+    // Include other query params (excluding table, city, bypass)
     const queryParams = Object.entries(params)
-      .filter(([key, val]) => !["table", "date", "city", "bypass"].includes(key) && val)
+      .filter(([key, val]) => !["table", "city", "bypass"].includes(key) && val)
       .map(([key, val]) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
 
     if (formula) queryParams.push(`filterByFormula=${encodeURIComponent(formula)}`);
