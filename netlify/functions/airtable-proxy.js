@@ -3,60 +3,45 @@ export async function handler(event, context) {
   try {
     const params = event.queryStringParameters || {};
 
-    // Required pieces
     const tableName = params.table || "All Events";
     const encodedTable = encodeURIComponent(tableName);
 
     const baseId = process.env.AIRTABLE_BASE_ID;
     const apiKey = process.env.AIRTABLE_API_KEY;
 
-    if (!baseId || !apiKey) {
-      throw new Error("Airtable Base ID or API Key is missing");
+    if (!baseId || !apiKey) throw new Error("Airtable Base ID or API Key is missing");
+
+    let url = `https://api.airtable.com/v0/${baseId}/${encodedTable}?`;
+
+    // Build filterByFormula dynamically
+    let conditions = [];
+
+    // Date filter
+    if (params.date) {
+      const isoDate = `${params.date}T00:00:00.000Z`; // ISO format
+      conditions.push(`IS_SAME({Event Date}, "${isoDate}", 'day')`);
     }
 
-    // Start URL
-    let url = `https://api.airtable.com/v0/${baseId}/${encodedTable}`;
+    // Price filter
+    conditions.push(`{Total Charged Amount} >= 15`);
+    conditions.push(`{Total Charged Amount} <= 999999999`);
 
-    // --- Build filterByFormula dynamically ---
-    let formula = null;
-    if (params.date || params.city || params.bypass) {
-      const date = params.date ? `"${params.date}"` : null;
-      const city = params.city ? `"${params.city}"` : null;
-      const bypass = params.bypass === "1";
+    // City / Bypass
+    const orParts = [];
+    if (params.city) orParts.push(`{Event City} = "${params.city}"`);
+    if (params.bypass === "1") orParts.push(`{Universal Event Bypass} = TRUE()`);
+    if (orParts.length) conditions.push(`OR(${orParts.join(", ")})`);
 
-      const conditions = [
-        date ? `IS_SAME({Event Date}, ${date}, 'day')` : null,
-        `{Total Charged Amount} >= 15`,
-        `{Total Charged Amount} <= 999999999`,
-      ].filter(Boolean);
-
-      // city OR bypass logic
-      if (city || bypass) {
-        const orParts = [];
-        if (city) orParts.push(`{Event City} = ${city}`);
-        if (bypass) orParts.push(`{Universal Event Bypass} = 1`);
-        conditions.push(`OR(${orParts.join(", ")})`);
-      }
-
-      formula = `AND(${conditions.join(", ")})`;
-    }
+    const formula = conditions.length ? `AND(${conditions.join(",")})` : null;
 
     // Build query string
-    let first = true;
-    for (const [key, value] of Object.entries(params)) {
-      if (["table", "date", "city", "bypass"].includes(key) || !value) continue;
-      url += first
-        ? `?${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-        : `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-      first = false;
-    }
+    const queryParams = Object.entries(params)
+      .filter(([key, val]) => !["table", "date", "city", "bypass"].includes(key) && val)
+      .map(([key, val]) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
 
-    // Append formula if created
-    if (formula) {
-      url += first
-        ? `?filterByFormula=${encodeURIComponent(formula)}`
-        : `&filterByFormula=${encodeURIComponent(formula)}`;
-    }
+    if (formula) queryParams.push(`filterByFormula=${encodeURIComponent(formula)}`);
+
+    url += queryParams.join("&");
 
     console.log("Fetching Airtable URL:", url);
 
@@ -77,18 +62,14 @@ export async function handler(event, context) {
     return {
       statusCode: 200,
       body: JSON.stringify(data),
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Access-Control-Allow-Origin": "*" },
     };
   } catch (err) {
     console.error("Error in Airtable Proxy:", err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: err.message }),
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Access-Control-Allow-Origin": "*" },
     };
   }
 }
