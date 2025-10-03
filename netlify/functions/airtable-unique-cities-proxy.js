@@ -1,6 +1,6 @@
-const fetch = require("node-fetch");
+// Node 18+ supports fetch natively, no need for node-fetch
 
-exports.handler = async function (event, context) {
+exports.handler = async function (event) {
   // Handle CORS preflight request
   if (event.httpMethod === "OPTIONS") {
     return {
@@ -30,30 +30,28 @@ exports.handler = async function (event, context) {
       };
     }
 
-    const url = `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(tableName)}?view=${encodeURIComponent(viewName)}`;
-
+    let url = `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(tableName)}?view=${encodeURIComponent(viewName)}`;
     let allRecords = [];
     let offset;
 
+    // Fetch all pages
     do {
       const res = await fetch(offset ? `${url}&offset=${offset}` : url, {
         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
       });
       const data = await res.json();
-      allRecords = allRecords.concat(data.records);
+      if (data.records) allRecords = allRecords.concat(data.records);
       offset = data.offset;
     } while (offset);
 
-    const cities = allRecords
-      .map(record => record.fields.city)
-      .filter(Boolean);
-
+    // Extract unique city values
+    const cities = allRecords.map(r => r.fields.city).filter(Boolean);
     const uniqueCities = [...new Set(cities)];
 
     return {
       statusCode: 200,
       headers: {
-        "Access-Control-Allow-Origin": "*", // ✅ allow any origin
+        "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json"
       },
       body: JSON.stringify(uniqueCities)
