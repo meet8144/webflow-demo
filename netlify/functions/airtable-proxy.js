@@ -4,8 +4,8 @@ export async function handler(event, context) {
     const params = event.queryStringParameters || {};
 
     // Airtable credentials
-    const baseId = "app3cnkgCHioDIU3j"; //process.env.AIRTABLE_BASE_ID;
-    const apiKey = "patm9uj52ZjZicUUT.1c872666f73d4a893c2d682dd297217be8bbe4c7cd5088222309470c6075964a"; //process.env.AIRTABLE_API_KEY;
+    const baseId = process.env.AIRTABLE_BASE_ID;
+    const apiKey = process.env.AIRTABLE_API_KEY;
     if (!baseId || !apiKey) throw new Error("Airtable Base ID or API Key is missing");
 
     // Table name (default "All Events")
