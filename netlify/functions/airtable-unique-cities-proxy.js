@@ -1,7 +1,5 @@
-// Node 18+ supports fetch natively, no need for node-fetch
-
 exports.handler = async function (event) {
-  // Handle CORS preflight request
+  // Handle CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -18,9 +16,9 @@ exports.handler = async function (event) {
     const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
     const BASE_ID = process.env.AIRTABLE_BASE_ID;
 
-    // Get table and view from query params
     const tableName = event.queryStringParameters?.table;
     const viewName = event.queryStringParameters?.view || "Grid view";
+    const columnName = event.queryStringParameters?.column || "city"; // default to 'city'
 
     if (!tableName) {
       return {
@@ -34,7 +32,6 @@ exports.handler = async function (event) {
     let allRecords = [];
     let offset;
 
-    // Fetch all pages
     do {
       const res = await fetch(offset ? `${url}&offset=${offset}` : url, {
         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
@@ -44,9 +41,9 @@ exports.handler = async function (event) {
       offset = data.offset;
     } while (offset);
 
-    // Extract unique city values
-    const cities = allRecords.map(r => r.fields.city).filter(Boolean);
-    const uniqueCities = [...new Set(cities)];
+    // Use dynamic column name
+    const values = allRecords.map(r => r.fields[columnName]).filter(Boolean);
+    const uniqueValues = [...new Set(values)];
 
     return {
       statusCode: 200,
@@ -54,7 +51,7 @@ exports.handler = async function (event) {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(uniqueCities)
+      body: JSON.stringify(uniqueValues)
     };
 
   } catch (err) {
